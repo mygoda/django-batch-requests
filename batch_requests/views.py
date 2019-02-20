@@ -8,7 +8,7 @@ import json
 
 from django.core.urlresolvers import resolve
 from django.http.response import HttpResponse, HttpResponseBadRequest,\
-    HttpResponseServerError
+    HttpResponseServerError, JsonResponse
 from django.template.response import ContentNotRenderedError
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -17,6 +17,19 @@ from batch_requests.exceptions import BadBatchRequest
 from batch_requests.settings import br_settings as _settings
 from batch_requests.utils import get_wsgi_request_object
 from datetime import datetime
+
+
+class SupportPython3Encoder(json.JSONEncoder):
+
+    def default(self, obj):
+        """
+        support
+        :param obj:
+        :return:
+        """
+        if isinstance(obj, bytes):
+            return str(obj, encoding='utf-8')
+        return json.JSONEncoder.default(self, obj)
 
 
 def get_response(wsgi_request):
@@ -49,7 +62,6 @@ def get_response(wsgi_request):
     # Check if we need to send across the duration header.
     if _settings.ADD_DURATION_HEADER:
         d_resp['headers'].update({_settings.DURATION_HEADER_NAME: (datetime.now() - service_start_time).seconds})
-
     return d_resp
 
 
@@ -121,7 +133,7 @@ def handle_batch_requests(request, *args, **kwargs):
 
     # Evrything's done, return the response.
     resp = HttpResponse(
-        content=json.dumps(response), content_type="application/json")
+        content=json.dumps(response, cls=SupportPython3Encoder), content_type="application/json")
 
     if _settings.ADD_DURATION_HEADER:
         resp.__setitem__(_settings.DURATION_HEADER_NAME, str((datetime.now() - batch_start_time).seconds))
